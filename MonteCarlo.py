@@ -4,6 +4,9 @@
 #r (Interest Rate): The annual risk-free interest rate.
 #T (Time to Expiration): The time remaining until the option’s expiration, usually in years.
 #σ (Volatility): The annualized standard deviation of the returns of the underlying asset
+
+#to run: streamlit run /Users/dylanhans/PycharmProjects/pricing_models/MonteCarlo.py
+
 import matplotlib as matplotlib
 import numpy as np
 import pandas as pd
