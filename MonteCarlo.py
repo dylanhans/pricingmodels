@@ -1,21 +1,11 @@
-# Pricing Models Interface - Dylan
-#S0 (Price of the Underlying Asset): The current market price of the underlying asset.
-#K (Strike Price): The price at which the option holder can buy (for a call) or sell (for a put) the underlying asset.
-#r (Interest Rate): The annual risk-free interest rate.
-#T (Time to Expiration): The time remaining until the option’s expiration, usually in years.
-#σ (Volatility): The annualized standard deviation of the returns of the underlying asset
+# Pricing Models Interface Monte Carlo - Dylan
+
+# Comp simulation that relies on rptd rdm sampling for results
 
 #to run: streamlit run /Users/dylanhans/PycharmProjects/pricing_models/MonteCarlo.py
 
-import matplotlib as matplotlib
 import numpy as np
-import pandas as pd
 from scipy.stats import norm
-from numpy.random import randn
-from numpy import random as rn
-import scipy.stats as si
-from matplotlib import pyplot as plt
-from IPython.display import Image
 import streamlit as st
 
 st.title("Monte Carlo")
