@@ -3,105 +3,73 @@
 # Comp simulation that relies on rptd rdm sampling for results
 
 #to run: streamlit run /Users/dylanhans/PycharmProjects/pricing_models/MonteCarlo.py
-
 import numpy as np
 from scipy.stats import norm
+import matplotlib.pyplot as plt
 import streamlit as st
+import pandas as pd
+import datetime as dt
+from pandas_datareader import data as pdr
+import yfinance as yf
 
-st.title("Monte Carlo")
+yf.pdr_override()
 
-# creates a horizontal line
-st.write("---")
+def get_data(stocks, start, end):
+    try:
+        stockData = pdr.get_data_yahoo(stocks, start, end)
+        if stockData.empty:
+            raise ValueError("No data returned from Yahoo Finance")
+        stockData = stockData['Close']
+        returns = stockData.pct_change()
+        covMatrix = returns.cov()  # Assuming you want to compute covariance of returns
+        meanReturns = returns.mean()
+        return meanReturns, covMatrix
+    except Exception as e:
+        st.error(f"Make a selection")
+        return None, None
 
+# Streamlit app title
+st.title('Monte Carlo Simulation')
 
-def black_scholes_calc(S0, K, r, T, sigma, option_type):
-    '''This function calculates the value of the European option based on Black-Scholes formula'''
-    # 1) determine N(d1) and N(d2)
-    d1 = 1 / (sigma * np.sqrt(T)) * (np.log(S0 / K) + (r + sigma ** 2 / 2) * T)
-    d2 = d1 - sigma * np.sqrt(T)
-    nd1 = norm.cdf(d1)
-    nd2 = norm.cdf(d2)
-    n_d1 = norm.cdf(-d1)
-    n_d2 = norm.cdf(-d2)
-    # 2) determine call value
-    c = nd1 * S0 - nd2 * K * np.exp(-r * T)
-    # 3) determine put value
-    p = K * np.exp(-r * T) * n_d2 - S0 * n_d1
-    # 4) define which value to return based on the option_type parameter
-    if option_type == 'call':
-        st.success(c)
-    elif option_type == 'put':
-        st.success(p)
-    else:
-        st.write('Wrong option type specified')
+# Sidebar for user input
+st.sidebar.title('Simulation Parameters')
+stocks = st.sidebar.multiselect('Select stocks', ['AAPL', 'GOOGL', 'MSFT', 'AMZN', 'TSLA'])
+startDate = st.sidebar.date_input("Start Date", dt.date.today() - dt.timedelta(days=300))
+endDate = st.sidebar.date_input("End Date", dt.date.today())
 
+# Fetch data
+meanReturns, covMatrix = get_data(stocks, startDate, endDate)
 
-col1, col2 = st.columns(2, gap='large')
-with col1:
-    st.header('Enter input parameters')
-    # input parameters
-    S0 = st.number_input(label="Price of the underlying asset", value=8)
-    K = st.number_input(label="Strike price", value=9)
-    r = st.number_input(label="Interest rate", value=0.01)
-    T = st.number_input(label="Time to option expiration", value=3 / 12)
-    sigma = st.number_input(label="Volatility", value=0.2)
-    option_type = st.selectbox(
-        'Option type',
-        ('call', 'put'))
-    if st.button("Calculate result"):
-        black_scholes_calc(S0, K, r, T, sigma, option_type)
+# If data is successfully retrieved, proceed with simulation and visualization
+if meanReturns is not None and covMatrix is not None:
+    # Randomly generate weights
+    weights = np.random.random(len(meanReturns))
+    weights /= np.sum(weights)
 
-with col2:
-    st.header('Step by step calculation')
-    # d1
-    st.latex(
-        r'''d_1 = \frac{1}{\sigma\sqrt{T}} \left(\ln\left(\frac{S_0}{K}\right) + \left(r + \frac{\sigma^2}{2}\right)T\right)''')
-    d1 = 1 / (sigma * np.sqrt(T)) * (np.log(S0 / K) + (r + sigma ** 2 / 2) * T)
-    st.write(fr"d_1 = {d1}")
-    # d2
-    st.latex(r'''d_2 = d_1 - \sigma\sqrt{T}''')
-    d2 = d1 - sigma * np.sqrt(T)
-    st.write(f"d_2 = {d2}")
-    # # N(d1)
-    # st.latex(r'''N(d1) = \text{norm.cdf}(d1)''')
-    nd1 = norm.cdf(d1)
-    # st.write(f"N(d1) = {nd1}")
-    # # N(d2)
-    # st.latex(r'''N(d2) = \text{norm.cdf}(d2)''')
-    nd2 = norm.cdf(d2)
-    # st.write(f"N(d2) = {nd2}")
+    # Number of simulations
+    MonteCarlo_sims = 100
+    # Number of days
+    T = 100
 
-    # # N(-d1)
-    # st.latex(r'''N(-d1) = \text{norm.cdf}(-d1)''')
-    n_d1 = norm.cdf(-d1)
-    # st.write(f"N(-d1) = {n_d1}")
+    # Initialize arrays
+    MatrixMean = np.full(shape=(T, len(weights)), fill_value=meanReturns)
+    MatrixMean = MatrixMean.T
+    Portfolio_sims = np.full(shape=(T, MonteCarlo_sims), fill_value=0.0)
+    InitialPort = 10000
 
-    # # N(-d2)
-    # st.latex(r'''N(-d2) = \text{norm.cdf}(-d2)''')
-    n_d2 = norm.cdf(-d2)
-    # st.write(f"N(-d2) = {n_d2}")
+    # Run simulations
+    for m in range(0, MonteCarlo_sims):
+        Z = np.random.normal(size=(T, len(weights)))
+        L = np.linalg.cholesky(covMatrix)
+        dailyReturns = MatrixMean + np.inner(L, Z)
+        Portfolio_sims[:,m] = np.cumprod(np.inner(weights, dailyReturns.T)+1)*InitialPort
 
-    # Call Option Value (c)
-    st.latex(r'''c = N(d_1)S_0 - N(d_2)Ke^{-rT}''')
-    c = nd1 * S0 - nd2 * K * np.exp(-r * T)
-    st.write(f"Call Option Value (c) = {c}")
+    # Plot simulations
+    fig, ax = plt.subplots()
+    for m in range(0, MonteCarlo_sims):
+        ax.plot(Portfolio_sims[:, m])
 
-    # Put Option Value (p)
-    st.latex(r'''p = Ke^{-rT}N(-d_2) - S_0N(-d_1)''')
-    p = K * np.exp(-r * T) * n_d2 - S0 * n_d1
-    st.write(f"Put Option Value (p) = {p}")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+    ax.set_xlabel('Days')
+    ax.set_ylabel('Portfolio Value ($)')
+    ax.set_title('Stock Portfolio MC')
+    st.pyplot(fig)
